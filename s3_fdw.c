@@ -113,10 +113,16 @@ Datum s3_fdw_validator(PG_FUNCTION_ARGS);
 
 /*
  * FDW callback routines
- */
 static FdwPlan *s3PlanForeignScan(Oid foreigntableid,
 					PlannerInfo *root,
 					RelOptInfo *baserel);
+
+ */
+
+static void s3GetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
+static void s3GetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
+static ForeignScan *s3GetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreign_table_id, ForeignPath *best_path, List *tlist, List *scan_clauses)
+
 static void s3ExplainForeignScan(ForeignScanState *node, ExplainState *es);
 static void s3BeginForeignScan(ForeignScanState *node, int eflags);
 static TupleTableSlot *s3IterateForeignScan(ForeignScanState *node);
@@ -197,7 +203,9 @@ s3_fdw_handler(PG_FUNCTION_ARGS)
 {
 	FdwRoutine *fdwroutine = makeNode(FdwRoutine);
 
-	fdwroutine->PlanForeignScan = s3PlanForeignScan;
+	fdwroutine->GetForeignRelSize = s3GetForeignRelSize;
+	fdwroutine->GetForeignPaths = s3GetForeignPaths;
+	fdwroutine->GetForeignPlan = s3GetForeignPlan;
 	fdwroutine->ExplainForeignScan = s3ExplainForeignScan;
 	fdwroutine->BeginForeignScan = s3BeginForeignScan;
 	fdwroutine->IterateForeignScan = s3IterateForeignScan;
@@ -431,6 +439,61 @@ s3GetOptions(Oid foreigntableid, S3FdwExecutionState *state)
 
 	state->copy_options = new_options;
 }
+
+static void
+s3GetForeignRelSize(PlannerInfo *root,
+                    RelOptInfo *baserel,
+                    Oid foreigntableid)
+{
+  // Do nothing here right now
+}
+
+static void
+s3GetForeignPaths(PlannerInfo *root,
+                  RelOptInfo *baserel,
+                  Oid foreigntableid)
+{
+  Cost startup_cost;
+  Cost total_cost;
+  add_path(baserel, (Path *)
+           create_foreignscan_path(root, baserel,
+                                   baserel->rows,
+                                   baserel->baserestrictcost.startup,
+                                   baserel->baserestrictcost.startup,
+                                   NIL,                /* no pathkeys */
+                                   NULL,                /* no outer rel either */
+                                   NIL));                /* no fdw_private data */
+}
+
+static ForeignScan *
+s3GetForeignPlan(PlannerInfo *root,
+                 RelOptInfo *baserel,
+                 Oid foreigntableid,
+                 ForeignPath *best_path,
+                 List *tlist,
+                 List *scan_clauses)
+{
+        Index                scan_relid = baserel->relid;
+
+        /*
+         * We have no native ability to evaluate restriction clauses, so we just
+         * put all the scan_clauses into the plan node's qual list for the
+         * executor to check.  So all we have to do here is strip RestrictInfo
+         * nodes from the clauses and ignore pseudoconstants (which will be
+         * handled elsewhere).
+         */
+        scan_clauses = extract_actual_clauses(scan_clauses, false);
+
+        /* Create the ForeignScan node */
+        return make_foreignscan(tlist,
+                                scan_clauses,
+                                scan_relid,
+                                NIL,        /* no expressions to evaluate */
+                                NIL);                /* no private state either */
+
+}
+
+
 
 /*
  * s3PlanForeignScan
