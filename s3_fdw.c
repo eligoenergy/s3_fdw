@@ -121,7 +121,7 @@ static FdwPlan *s3PlanForeignScan(Oid foreigntableid,
 
 static void s3GetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
 static void s3GetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
-static ForeignScan *s3GetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreign_table_id, ForeignPath *best_path, List *tlist, List *scan_clauses)
+static ForeignScan *s3GetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreign_table_id, ForeignPath *best_path, List *tlist, List *scan_clauses);
 
 static void s3ExplainForeignScan(ForeignScanState *node, ExplainState *es);
 static void s3BeginForeignScan(ForeignScanState *node, int eflags);
@@ -493,31 +493,6 @@ s3GetForeignPlan(PlannerInfo *root,
 
 }
 
-
-
-/*
- * s3PlanForeignScan
- *		Create a FdwPlan for a scan on the foreign table
- */
-static FdwPlan *
-s3PlanForeignScan(Oid foreigntableid,
-				  PlannerInfo *root,
-				  RelOptInfo *baserel)
-{
-	FdwPlan		    *fdwplan;
-	S3FdwExecutionState state;
-
-	/* Fetch options -- it's not sure what is needed here */
-	s3GetOptions(foreigntableid, &state);
-
-	/* Construct FdwPlan with cost estimates */
-	fdwplan = makeNode(FdwPlan);
-	estimate_costs(root, baserel, state.filename,
-				   &fdwplan->startup_cost, &fdwplan->total_cost);
-	fdwplan->fdw_private = NIL; /* not used */
-
-	return fdwplan;
-}
 
 /*
  * s3ExplainForeignScan
