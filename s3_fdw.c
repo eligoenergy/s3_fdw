@@ -453,8 +453,6 @@ s3GetForeignPaths(PlannerInfo *root,
                   RelOptInfo *baserel,
                   Oid foreigntableid)
 {
-  Cost startup_cost;
-  Cost total_cost;
   add_path(baserel, (Path *)
            create_foreignscan_path(root, baserel,
                                    baserel->rows,
@@ -635,6 +633,7 @@ s3BeginForeignScan(ForeignScanState *node, int eflags)
 	 */
 	cstate = BeginCopyFrom(node->ss.ss_currentRelation,
 						   ctx.datafn,
+					           false,
 						   NIL,
 						   festate->copy_options);
 
@@ -659,13 +658,13 @@ s3IterateForeignScan(ForeignScanState *node)
 	S3FdwExecutionState *festate = (S3FdwExecutionState *) node->fdw_state;
 	TupleTableSlot *slot = node->ss.ss_ScanTupleSlot;
 	bool		found;
-	ErrorContextCallback errcontext;
+	ErrorContextCallback errcallback;
 
 	/* Set up callback to identify error line number. */
-	errcontext.callback = CopyFromErrorCallback;
-	errcontext.arg = (void *) festate->cstate;
-	errcontext.previous = error_context_stack;
-	error_context_stack = &errcontext;
+	errcallback.callback = CopyFromErrorCallback;
+	errcallback.arg = (void *) festate->cstate;
+	errcallback.previous = error_context_stack;
+	error_context_stack = &errcallback;
 
 	/*
 	 * The protocol for loading a virtual tuple into a slot is first
@@ -687,7 +686,7 @@ s3IterateForeignScan(ForeignScanState *node)
 		ExecStoreVirtualTuple(slot);
 
 	/* Remove error callback. */
-	error_context_stack = errcontext.previous;
+	error_context_stack = errcallback.previous;
 
 	return slot;
 }
@@ -722,6 +721,7 @@ s3ReScanForeignScan(ForeignScanState *node)
 
 	festate->cstate = BeginCopyFrom(node->ss.ss_currentRelation,
 									festate->filename,
+									false,
 									NIL,
 									festate->copy_options);
 }

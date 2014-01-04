@@ -35,3 +35,7 @@ Dependencies
 ------------
 The `s3_fdw` data type depends on libcurl and openssl. You need those developer
 packages installed in the system path.
+
+Postgresql 9.3
+--------------
+This fork is meant to support Postgresql 9.3 (and maybe 9.2).
